@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS PhD Research Proposal Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application is designed as an interactive dashboard. The main view is a filterable gallery of research proposal cards. A persistent sidebar contains filters for 'University' and 'Research Area'. This structure was chosen to allow prospective PhD students to easily navigate and compare proposals based on their specific interests (e.g., "Show me all AI proposals from MIT and Stanford"). A dynamic bar chart provides a visual summary of the available proposals by topic, which updates with filtering. This interactive, task-oriented design is more user-friendly and insightful than a static list, helping users quickly find relevant examples. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: List of CS PhD research proposals. Goal: Inform & Compare. Viz/Presentation: Interactive grid of cards with key details (Title, University, Area). Interaction: Users can filter by university and research area, instantly updating the grid. Justification: This allows for targeted exploration. Library/Method: HTML/Tailwind and Vanilla JS.
+        - Report Info: Distribution of proposal topics. Goal: Organize & Inform. Viz/Presentation: Horizontal Bar Chart showing the count of proposals in each research area. Interaction: The chart is dynamically updated based on the university and area filters applied by the user. Justification: Provides a quick visual overview of the dataset's composition. Library/Method: Chart.js (Canvas).
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+            color: #383838;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border: 1px solid #EAEAEA;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .tag {
+            background-color: #F3F4F6;
+            color: #4B5563;
+        }
+        .btn-primary {
+            background-color: #A58D78;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #8E7763;
+        }
+        .filter-section {
+            background-color: #F8F5F2;
+        }
+        .chart-container {
+            position: relative; 
+            width: 100%; 
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="min-h-screen flex flex-col">
+        <header class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <h1 class="text-3xl font-bold text-gray-800">CS PhD Research Proposal Explorer</h1>
+                <p class="text-gray-600 mt-1">An interactive collection of sample proposals from top universities.</p>
+            </div>
+        </header>
+
+        <div class="flex-1 flex flex-col md:flex-row">
+            <aside class="w-full md:w-64 lg:w-72 p-6 filter-section border-r border-gray-200">
+                <h2 class="text-xl font-semibold mb-4">Filters</h2>
+                
+                <div id="university-filter" class="mb-6">
+                    <h3 class="font-semibold mb-3 text-gray-700">University</h3>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-800 focus:ring-amber-700" value="All" checked>
+                            <span class="ml-2 text-gray-700">All Universities</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="area-filter">
+                    <h3 class="font-semibold mb-3 text-gray-700">Research Area</h3>
+                    <div class="space-y-2">
+                         <label class="flex items-center">
+                            <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-800 focus:ring-amber-700" value="All" checked>
+                            <span class="ml-2 text-gray-700">All Areas</span>
+                        </label>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="flex-1 p-6 md:p-8 lg:p-10">
+                <section id="chart-section" class="mb-10">
+                    <h2 class="text-2xl font-bold mb-4">Proposals by Research Area</h2>
+                    <p class="text-gray-600 mb-4">This chart shows the number of sample proposals available for each computer science subfield in this collection. It updates automatically as you apply filters, providing a quick visual summary of the filtered results.</p>
+                    <div class="chart-container bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                        <canvas id="proposalsChart"></canvas>
+                    </div>
+                </section>
+
+                <section id="proposals-section">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">Research Proposals</h2>
+                        <p id="proposal-count" class="text-gray-600 font-medium"></p>
+                    </div>
+                    <div id="proposals-grid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                        <!-- Proposal cards will be injected here -->
+                    </div>
+                    <div id="no-results" class="hidden text-center py-10">
+                        <h3 class="text-xl font-medium text-gray-700">No proposals found</h3>
+                        <p class="text-gray-500 mt-2">Try adjusting your filters to find what you're looking for.</p>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const proposalsData = [
+            {
+                title: "Creating Artificial Musicians: Composition, Performance, and Synthesis",
+                university: "Carnegie Mellon University",
+                area: "AI / ML",
+                url: "https://www.cs.cmu.edu/afs/cs.cmu.edu/Web/Posters/Shuqi_PhD_Thesis_Proposal.pdf"
+            },
+            {
+                title: "Connecting Images and Natural Language",
+                university: "Stanford University",
+                area: "AI / ML",
+                url: "https://cs.stanford.edu/people/karpathy/main.pdf"
+            },
+            {
+                title: "Learning to Generalize via Self-Supervised Prediction",
+                university: "UC Berkeley",
+                area: "AI / ML",
+                url: "https://www2.eecs.berkeley.edu/Pubs/TechRpts/2019/EECS-2019-132.pdf"
+            },
+            {
+                title: "Terra: Simplifying High-Performance Programming Using Multi-Stage Programming",
+                university: "Stanford University",
+                area: "Systems",
+                url: "https://cs.stanford.edu/~zdevito/zdevito_thesis.pdf"
+            },
+            {
+                title: "Programming Technology for Molecular-Scale Computing",
+                university: "MIT",
+                area: "Systems",
+                url: "https://groups.csail.mit.edu/mac/projects/amorphous/6.978/papers/darpa.pdf"
+            },
+            {
+                title: "Data-Driven Cyber-Physical Systems via Real-Time Stream Analytics",
+                university: "UC Berkeley",
+                area: "Systems",
+                url: "https://www2.eecs.berkeley.edu/Pubs/TechRpts/2016/EECS-2016-159.pdf"
+            },
+            {
+                title: "Composite Security Requirements in the Presence of Uncertainty",
+                university: "Carnegie Mellon University",
+                area: "Security",
+                url: "https://www.cs.cmu.edu/~hhibshi/pdf/hhibshi_Proposal.pdf"
+            },
+            {
+                title: "Formal Verification of Hardware/Software Co-design",
+                university: "University of Cambridge",
+                area: "Formal Methods",
+                url: "https://www.cl.cam.ac.uk/archive/mjcg/proposals/ARM2/ARMProposal2PART2.pdf"
+            },
+            {
+                title: "Programming Contextual Computations",
+                university: "University of Cambridge",
+                area: "Programming Languages",
+                url: "https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-854.pdf"
+            }
+        ];
+
+        const proposalsGrid = document.getElementById('proposals-grid');
+        const proposalCount = document.getElementById('proposal-count');
+        const noResults = document.getElementById('no-results');
+        const universityFilter = document.getElementById('university-filter');
+        const areaFilter = document.getElementById('area-filter');
+        let chart = null;
+
+        const getUniqueValues = (key) => [...new Set(proposalsData.map(p => p[key]))].sort();
+
+        function setupFilters() {
+            const universities = getUniqueValues('university');
+            const areas = getUniqueValues('area');
+
+            const universityCheckboxes = universities.map(uni => `
+                <label class="flex items-center">
+                    <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-800 focus:ring-amber-700" value="${uni}">
+                    <span class="ml-2 text-gray-700">${uni}</span>
+                </label>
+            `).join('');
+            universityFilter.querySelector('.space-y-2').insertAdjacentHTML('beforeend', universityCheckboxes);
+            
+            const areaCheckboxes = areas.map(area => `
+                <label class="flex items-center">
+                    <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-800 focus:ring-amber-700" value="${area}">
+                    <span class="ml-2 text-gray-700">${area}</span>
+                </label>
+            `).join('');
+            areaFilter.querySelector('.space-y-2').insertAdjacentHTML('beforeend', areaCheckboxes);
+            
+            document.querySelectorAll('#university-filter input, #area-filter input').forEach(input => {
+                input.addEventListener('change', handleFilterChange);
+            });
+        }
+        
+        function handleFilterChange(e) {
+            const filterContainer = e.target.closest('div[id$="-filter"]');
+            const allCheckbox = filterContainer.querySelector('input[value="All"]');
+            const specificCheckboxes = Array.from(filterContainer.querySelectorAll('input:not([value="All"])'));
+
+            if (e.target.value === 'All') {
+                specificCheckboxes.forEach(cb => cb.checked = false);
+                allCheckbox.checked = true;
+            } else {
+                allCheckbox.checked = specificCheckboxes.every(cb => !cb.checked);
+            }
+            
+            render();
+        }
+
+        function getSelectedFilters(containerId) {
+            const container = document.getElementById(containerId);
+            const allChecked = container.querySelector('input[value="All"]').checked;
+            if (allChecked) return [];
+
+            return Array.from(container.querySelectorAll('input:checked')).map(input => input.value);
+        }
+
+        function render() {
+            const selectedUniversities = getSelectedFilters('university-filter');
+            const selectedAreas = getSelectedFilters('area-filter');
+
+            const filteredProposals = proposalsData.filter(p => {
+                const universityMatch = selectedUniversities.length === 0 || selectedUniversities.includes(p.university);
+                const areaMatch = selectedAreas.length === 0 || selectedAreas.includes(p.area);
+                return universityMatch && areaMatch;
+            });
+
+            renderProposals(filteredProposals);
+            updateChart(filteredProposals);
+        }
+        
+        function renderProposals(proposals) {
+            proposalsGrid.innerHTML = '';
+            
+            if (proposals.length === 0) {
+                noResults.classList.remove('hidden');
+                proposalsGrid.classList.add('hidden');
+            } else {
+                noResults.classList.add('hidden');
+                proposalsGrid.classList.remove('hidden');
+                proposals.forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = 'card rounded-lg p-6 flex flex-col shadow-sm';
+                    card.innerHTML = `
+                        <h3 class="text-lg font-bold text-gray-800 flex-1">${p.title}</h3>
+                        <div class="mt-4">
+                            <p class="text-sm font-medium text-amber-900">${p.university}</p>
+                            <span class="inline-block tag text-xs font-medium px-2 py-1 rounded-full mt-2">${p.area}</span>
+                        </div>
+                        <a href="${p.url}" target="_blank" rel="noopener noreferrer" class="btn-primary text-center font-semibold py-2 px-4 rounded-md mt-6 block">View Proposal</a>
+                    `;
+                    proposalsGrid.appendChild(card);
+                });
+            }
+
+            proposalCount.textContent = `${proposals.length} proposal${proposals.length !== 1 ? 's' : ''} found`;
+        }
+
+        function updateChart(proposals) {
+            const ctx = document.getElementById('proposalsChart').getContext('2d');
+            const areaCounts = proposals.reduce((acc, p) => {
+                acc[p.area] = (acc[p.area] || 0) + 1;
+                return acc;
+            }, {});
+
+            const sortedAreas = Object.keys(areaCounts).sort((a, b) => areaCounts[b] - areaCounts[a]);
+            const chartLabels = sortedAreas;
+            const chartData = sortedAreas.map(area => areaCounts[area]);
+            
+            if (chart) {
+                chart.data.labels = chartLabels;
+                chart.data.datasets[0].data = chartData;
+                chart.update();
+            } else {
+                chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: 'Number of Proposals',
+                            data: chartData,
+                            backgroundColor: '#D2B48C',
+                            borderColor: '#A58D78',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return ` ${context.raw} proposals`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            },
+                            y: {
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupFilters();
+            render();
+        });
+
+    </script>
+</body>
+</html>
